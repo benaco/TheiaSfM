@@ -213,53 +213,31 @@ ReconstructionEstimatorSummary IncrementalReconstructionEstimator::Estimate(
       reconstructed_views_.push_back(views_to_localize[i]);
       views_to_localize_.erase(views_to_localize[i]);
 
-      // Remove any tracks that have very bad 3D point reprojections after the
-      // new view has been merged. This can happen when a new observation of a
-      // 3D point has a very high reprojection error in the newly localized
-      // view.
-      const auto& tracks_in_new_view_vec =
-          reconstruction_->View(reconstructed_views_.back())->TrackIds();
-      const std::unordered_set<TrackId> tracks_in_new_view(
-          tracks_in_new_view_vec.begin(), tracks_in_new_view_vec.end());
-      RemoveOutlierTracks(
-          tracks_in_new_view,
-          triangulation_options_.max_acceptable_reprojection_error_pixels);
-
-      // Step 5: Estimate new 3D points. and Step 6: Bundle adjustment.
-      bool ba_success = false;
-      if (UnoptimizedGrowthPercentage() <
-          options_.full_bundle_adjustment_growth_percent) {
-        // Step 5: Perform triangulation on the most recent view.
-        timer.Reset();
-        EstimateStructure(reconstructed_views_.back());
-        summary_.triangulation_time += timer.ElapsedTimeInSeconds();
-
-        // Step 6: Then perform partial Bundle Adjustment.
-        timer.Reset();
-        ba_success = PartialBundleAdjustment();
-        summary_.bundle_adjustment_time += timer.ElapsedTimeInSeconds();
-      } else {
-        // Step 5: Perform triangulation on all views.
-        timer.Reset();
-        TrackEstimator track_estimator(triangulation_options_, reconstruction_);
-        const TrackEstimator::Summary triangulation_summary =
-            track_estimator.EstimateAllTracks();
-        summary_.triangulation_time += timer.ElapsedTimeInSeconds();
-
-        // Step 6: Full Bundle Adjustment.
-        timer.Reset();
-        ba_success = FullBundleAdjustment();
-        summary_.bundle_adjustment_time += timer.ElapsedTimeInSeconds();
-      }
-
-      SetUnderconstrainedAsUnestimated();
-
-      if (!ba_success) {
-        LOG(WARNING) << "Bundle adjustment failed!";
+      // Insert the estimated view into the reconstruction.
+      if (!InsertEstimatedView(timer, views_to_localize[i])) {
         summary_.success = false;
         return summary_;
       }
 
+      // Insert all views that share extrinsics with the view we just localized.
+      for (const auto& sibling_view_id : view_ids) {
+        const auto& sibling_view = reconstruction->MutableView(sibling_view_id);
+        if (sibling_view_id != views_to_localize[i]
+            && !sibling_view->IsEstimated()
+            && &(sibling_view->Camera().extrinsics()) == &(reconstruction->View(views_to_localize[i])->Camera().extrinsics())) {
+
+          reconstruction_->MutableView(sibling_view_id)->SetEstimated(true);
+
+          reconstructed_views_.push_back(sibling_view_id);
+          views_to_localize_.erase(sibling_view_id);
+
+          if (!InsertEstimatedView(timer, sibling_view_id)) {
+            // Inserting a sibling view failed.
+            summary_.success = false;
+            return summary_;
+          }
+        }
+      }
     }
   }
 
@@ -277,6 +255,56 @@ ReconstructionEstimatorSummary IncrementalReconstructionEstimator::Estimate(
                 << time_to_find_initial_seed;
   summary_.message = string_stream.str();
   return summary_;
+}
+
+bool IncrementalReconstructionEstimator::InsertEstimatedView(Timer &timer, ViewId view_id) {
+  // Remove any tracks that have very bad 3D point reprojections after the
+  // new view has been merged. This can happen when a new observation of a
+  // 3D point has a very high reprojection error in the newly localized
+  // view.
+  const auto& tracks_in_new_view_vec =
+      reconstruction_->View(view_id)->TrackIds();
+  const std::unordered_set<TrackId> tracks_in_new_view(
+      tracks_in_new_view_vec.begin(), tracks_in_new_view_vec.end());
+  RemoveOutlierTracks(
+      tracks_in_new_view,
+      triangulation_options_.max_acceptable_reprojection_error_pixels);
+
+  // Step 5: Estimate new 3D points. and Step 6: Bundle adjustment.
+  bool ba_success = false;
+  if (UnoptimizedGrowthPercentage() <
+      options_.full_bundle_adjustment_growth_percent) {
+    // Step 5: Perform triangulation on the most recent view.
+    timer.Reset();
+    EstimateStructure(view_id);
+    summary_.triangulation_time += timer.ElapsedTimeInSeconds();
+
+    // Step 6: Then perform partial Bundle Adjustment.
+    timer.Reset();
+    ba_success = PartialBundleAdjustment();
+    summary_.bundle_adjustment_time += timer.ElapsedTimeInSeconds();
+  } else {
+    // Step 5: Perform triangulation on all views.
+    timer.Reset();
+    TrackEstimator track_estimator(triangulation_options_, reconstruction_);
+    const TrackEstimator::Summary triangulation_summary =
+        track_estimator.EstimateAllTracks();
+    summary_.triangulation_time += timer.ElapsedTimeInSeconds();
+
+    // Step 6: Full Bundle Adjustment.
+    timer.Reset();
+    ba_success = FullBundleAdjustment();
+    summary_.bundle_adjustment_time += timer.ElapsedTimeInSeconds();
+  }
+
+  SetUnderconstrainedAsUnestimated();
+
+  if (!ba_success) {
+    LOG(WARNING) << "Bundle adjustment failed!";
+    return false;
+  }
+
+  return true;
 }
 
 void IncrementalReconstructionEstimator::InitializeCamerasFromTwoViewInfo(

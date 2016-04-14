@@ -15,6 +15,9 @@ TARGET_LINK_LIBRARIES(build_reconstruction theia ${GFLAGS_LIBRARIES} ${GLOG_LIBR
 ADD_EXECUTABLE(build_1dsfm_reconstruction build_1dsfm_reconstruction.cc)
 TARGET_LINK_LIBRARIES(build_1dsfm_reconstruction theia ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
 
+ADD_EXECUTABLE(build_panorama_reconstruction build_panorama_reconstruction.cc)
+TARGET_LINK_LIBRARIES(build_panorama_reconstruction theia ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
+
 # Reconstruction visualization.
 find_package(OpenGL REQUIRED)
 find_package(GLUT REQUIRED)
