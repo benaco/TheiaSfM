@@ -117,7 +117,11 @@ std::vector<int> GetIntrinsicsToOptimize(
 void AddCameraParametersToProblem(const std::vector<int>& constant_intrinsics,
                                   double* camera_parameters,
                                   ceres::Problem* problem) {
-  if (constant_intrinsics.size() > 0) {
+  if (constant_intrinsics.size() == Camera::kIntrinsicsSize) {
+    problem->AddParameterBlock(camera_parameters, Camera::kIntrinsicsSize);
+
+    problem->SetParameterBlockConstant(camera_parameters);
+  } else if (constant_intrinsics.size() > 0) {
     ceres::SubsetParameterization* subset_parameterization =
       new ceres::SubsetParameterization(Camera::kIntrinsicsSize,
                                         constant_intrinsics);
