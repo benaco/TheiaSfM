@@ -79,6 +79,7 @@ bool ReadCalibration(const std::string& calibration_file,
     temp_camera_intrinsics_prior.aspect_ratio.is_set = true;
     ifs >> temp_camera_intrinsics_prior.aspect_ratio.value;
 
+    /*
     temp_camera_intrinsics_prior.skew.is_set = true;
     ifs >> temp_camera_intrinsics_prior.skew.value;
 
@@ -87,6 +88,7 @@ bool ReadCalibration(const std::string& calibration_file,
 
     temp_camera_intrinsics_prior.radial_distortion[1].is_set = true;
     ifs >> temp_camera_intrinsics_prior.radial_distortion[1].value;
+    */
 
     (*camera_intrinsics_prior)[filename] = temp_camera_intrinsics_prior;
   }
