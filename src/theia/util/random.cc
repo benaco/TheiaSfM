@@ -35,8 +35,12 @@
 #include "theia/util/random.h"
 
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 #include <chrono>
 #include <random>
+
+DEFINE_int32(random_seed, -0xdeadbeef,
+             "Seed to initialize the random number generator");
 
 namespace theia {
 namespace {
@@ -46,7 +50,12 @@ std::default_random_engine util_generator;
 // Initializes the random generator to be based on the current time. Does not
 // have to be called before calling RandDouble, but it works best if it is.
 void InitRandomGenerator() {
-  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+  unsigned seed;
+  if (FLAGS_random_seed == -0xdeadbeef) {
+    seed = std::chrono::system_clock::now().time_since_epoch().count();
+  } else {
+    seed = FLAGS_random_seed;
+  }
   util_generator.seed(seed);
 }
 

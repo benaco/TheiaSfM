@@ -61,8 +61,8 @@ struct ReprojectionError {
     }
 
     T reprojection[2];
-    ProjectPointToImage(camera_intrinsics,
-                        camera_extrinsics,
+    ProjectPointToImage(camera_extrinsics,
+                        camera_intrinsics,
                         point_parameters,
                         sharedToLocalTransform,
                         reprojection);

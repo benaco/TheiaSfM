@@ -3,6 +3,9 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <cereal/cereal.hpp>
+#include <cereal/types/memory.hpp>
+#include <cereal/access.hpp>
 
 namespace theia {
 
@@ -19,7 +22,14 @@ public:
   static const int kExtrinsicsSize = 6;
 private:
   double parameters[kExtrinsicsSize];
+
+  friend class cereal::access;
+  template <class Archive>
+  void serialize(Archive& ar) {  // NOLINT
+    ar(parameters, sizeof(double) * kExtrinsicsSize);
+  }
 };
+
 
 }
 

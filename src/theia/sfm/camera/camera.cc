@@ -188,19 +188,13 @@ Matrix3d Camera::GetOrientationAsRotationMatrix() const {
   ceres::AngleAxisToRotationMatrix(
       extrinsics().extrinsics() + SharedExtrinsics::ORIENTATION,
       ceres::ColumnMajorAdapter3x3(world_to_shared_rotation.data()));
+      // std::cout << std::hex << "{" << this << "}Camera::GetOrientationAsRotationMatrix: " << shared_to_local_rotation * world_to_shared_rotation << std::endl;
   return shared_to_local_rotation * world_to_shared_rotation;
 }
 
 Vector3d Camera::GetOrientationAsAngleAxis() const {
-  Map<const Vector3d> world_to_shared_angle_axis(extrinsics().extrinsics() + SharedExtrinsics::ORIENTATION);
-  if (world_to_shared_angle_axis.norm() == 0) {
-    return Vector3d::Zero();
-  }
-
-  const Eigen::AngleAxisd world_to_shared_aa(world_to_shared_angle_axis.norm(), world_to_shared_angle_axis.normalized());
-  const Eigen::AngleAxisd world_to_local_aa(Eigen::Quaterniond(shared_to_local_rotation) * world_to_shared_aa);
-
-  return world_to_local_aa.angle() * world_to_local_aa.axis();
+  Eigen::AngleAxisd rotation_aa(GetOrientationAsRotationMatrix());
+  return rotation_aa.angle() * rotation_aa.axis();
 }
 
 void Camera::SetFocalLength(const double focal_length) {

@@ -36,6 +36,7 @@
 #define THEIA_SFM_CAMERA_CAMERA_H_
 
 #include <cereal/cereal.hpp>
+#include <cereal/types/memory.hpp>
 #include <cereal/access.hpp>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -200,6 +201,8 @@ class Camera {
   template <class Archive>
   void serialize(Archive& ar) {  // NOLINT
     ar(cereal::binary_data(camera_parameters_, sizeof(double) * kIntrinsicsSize),
+       shared_extrinsics,
+       cereal::binary_data(shared_to_local_rotation.data(), sizeof(double) * 9),
        cereal::binary_data(image_size_, sizeof(int) * 2));
   }
 

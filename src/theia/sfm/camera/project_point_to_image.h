@@ -59,7 +59,7 @@ template <typename T>
 T ProjectPointToImage(const T* extrinsic_parameters,
                       const T* intrinsic_parameters,
                       const T* point,
-                      const Eigen::Matrix3d sharedToLocalSpace,
+                      const Eigen::Matrix3d& sharedToLocalSpace,
                       T* pixel) {
   typedef Eigen::Matrix<T, 3, 1> Matrix3T;
   typedef Eigen::Map<const Matrix3T> ConstMap3T;
