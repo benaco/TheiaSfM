@@ -39,6 +39,7 @@
 #include <chrono>  // NOLINT
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #include "applications/command_line_helpers.h"
 
@@ -196,6 +197,7 @@ DEFINE_bool(root_sift, true, "Enables the usage of Root SIFT.");
 using theia::Reconstruction;
 using theia::ReconstructionBuilder;
 using theia::ReconstructionBuilderOptions;
+using theia::SharedExtrinsics;
 
 // Sets the feature extraction, matching, and reconstruction options based on
 // the command line flags. There are many more options beside just these located
@@ -356,12 +358,16 @@ void AddImagesToReconstructionBuilder(
   hardcoded_prior.skew.is_set = true;
   hardcoded_prior.skew.value = 0;
 
+  std::unordered_map<std::string, std::vector<std::string>> image_groups;
   for (const std::string& image_file : image_files) {
-    std::string image_filename;
-    CHECK(theia::GetFilenameFromFilepath(image_file, true, &image_filename));
+    image_groups[std::string(image_file.begin(), image_file.begin() + image_file.size() - 5)].push_back(image_file);
+  }
 
-    CHECK(reconstruction_builder->AddImageWithCameraIntrinsicsPrior(
-        image_file, hardcoded_prior));
+  for (const auto& image_group : image_groups) {
+
+    CHECK_EQ(image_group.second.size(), 6);
+    CHECK(reconstruction_builder->AddImagesWithSharedExtrinsics(image_group.second, hardcoded_prior));
+
   }
 
   // Extract and match features.

@@ -124,6 +124,12 @@ class ReconstructionBuilder {
       const std::string& image_filepath,
       const CameraIntrinsicsPrior& camera_intrinsics_prior);
 
+  // Add a list of images with shared extrinsics and no matching performed between them.
+  bool AddImagesWithSharedExtrinsics(
+    const std::vector<std::string>& image_filepaths,
+    const CameraIntrinsicsPrior& camera_intrinsics_prior
+  );
+
   // Add a match to the view graph. Either this method is repeatedly called or
   // ExtractAndMatchFeatures must be called.
   bool AddTwoViewMatch(const std::string& image1,

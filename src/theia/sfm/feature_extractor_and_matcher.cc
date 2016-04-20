@@ -166,6 +166,11 @@ void FeatureExtractorAndMatcher::ExtractAndMatchFeatures(
   }
 }
 
+void FeatureExtractorAndMatcher::SetImagePairsToMatch(
+  const std::vector<std::pair<std::string, std::string> >& pairs_to_match) {
+  matcher_->SetImagePairsToMatch(pairs_to_match);
+}
+
 void FeatureExtractorAndMatcher::ProcessImage(
     const int i) {
   const std::string& image_filepath = image_filepaths_[i];

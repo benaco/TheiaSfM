@@ -74,6 +74,34 @@ bool AddViewToReconstruction(const std::string& image_filepath,
   return true;
 }
 
+bool AddViewToReconstructionWithSharedExtrinsics(
+  const std::string& image_filepath,
+  const CameraIntrinsicsPrior* intrinsics,
+  Reconstruction* reconstruction,
+  const std::shared_ptr<SharedExtrinsics>& shared_extrinsics
+  ) {
+
+  std::string image_filename;
+  CHECK(GetFilenameFromFilepath(image_filepath, true, &image_filename));
+
+  // Add the image to the reconstruction.
+  const ViewId view_id = reconstruction->AddView(image_filename);
+  if (view_id == kInvalidViewId) {
+    LOG(INFO) << "Could not add " << image_filename
+              << " to the reconstruction.";
+    return false;
+  }
+
+  View* view = reconstruction->MutableView(view_id);
+  // Add the camera intrinsics priors if available.
+  if (intrinsics != nullptr) {
+    *view->MutableCameraIntrinsicsPrior() = *intrinsics;
+  }
+  // Set shared extrinsics
+  view->MutableCamera()->SetSharedExtrinsics(shared_extrinsics);
+  return true;
+}
+
 Reconstruction* CreateEstimatedSubreconstruction(
     const Reconstruction& input_reconstruction) {
   std::unique_ptr<Reconstruction> subreconstruction(
@@ -186,6 +214,29 @@ bool ReconstructionBuilder::AddImageWithCameraIntrinsicsPrior(
                                                   camera_intrinsics_prior);
 }
 
+
+bool ReconstructionBuilder::AddImagesWithSharedExtrinsics(
+  const std::vector<std::string>& image_filepaths,
+  const CameraIntrinsicsPrior& camera_intrinsics_prior) {
+
+  std::shared_ptr<SharedExtrinsics> shared_extrinsics = std::make_shared<SharedExtrinsics>();
+  for (const auto& image_filepath : image_filepaths) {
+    image_filepaths_.emplace_back(image_filepath);
+    if (!AddViewToReconstructionWithSharedExtrinsics(image_filepath,
+        &camera_intrinsics_prior,
+        reconstruction_.get(),
+        shared_extrinsics
+      )) {
+      return false;
+    }
+    if (!feature_extractor_and_matcher_->AddImage(image_filepath,camera_intrinsics_prior)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void ReconstructionBuilder::RemoveUncalibratedViews() {
   const auto& view_ids = reconstruction_->ViewIds();
   for (const ViewId view_id : view_ids) {
@@ -205,6 +256,25 @@ bool ReconstructionBuilder::ExtractAndMatchFeatures() {
   // Extract features and obtain the feature matches.
   std::vector<ImagePairMatch> matches;
   std::vector<CameraIntrinsicsPrior> camera_intrinsics_priors;
+
+  std::vector<std::pair<std::string, std::string> > pairs_to_match;
+  std::vector<std::string> image_files(image_filepaths_.size());
+  for (size_t i = 0; i < image_filepaths_.size(); i++) {
+    CHECK(theia::GetFilenameFromFilepath(image_filepaths_[i], true, &image_files[i]));
+  }
+  const auto& view_ids = reconstruction_->ViewIds();
+  for (size_t i = 0; i < view_ids.size(); i++) {
+    const View* view0 = reconstruction_->View(view_ids[i]);
+    for (size_t j = i + 1; j < view_ids.size(); j++) {
+      const View* view1 = reconstruction_->View(view_ids[j]);
+      // don't add pairs which share extrinsics
+      if (&view0->Camera().extrinsics() != &view1->Camera().extrinsics()) {
+        pairs_to_match.emplace_back(image_files[i], image_files[j]);
+      }
+    }
+  }
+  feature_extractor_and_matcher_->SetImagePairsToMatch(pairs_to_match);
+
   feature_extractor_and_matcher_->ExtractAndMatchFeatures(
       &camera_intrinsics_priors, &matches);
 
