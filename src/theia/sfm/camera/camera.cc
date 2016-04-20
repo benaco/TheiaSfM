@@ -62,7 +62,7 @@ Camera::Camera(std::shared_ptr<SharedExtrinsics> shared_extrinsics) {
   SetSkew(0.0);
   SetPrincipalPoint(0.0, 0.0);
   SetRadialDistortion(0.0, 0.0);
-  SetSharedToLocalTransform(Eigen::Matrix3d::Identity());
+  SetSharedToCameraTransform(Eigen::Matrix3d::Identity());
   SetSharedExtrinsics(shared_extrinsics);
 
   image_size_[0] = 0;
@@ -82,15 +82,15 @@ bool Camera::InitializeFromProjectionMatrix(
   image_size_[0] = image_width;
   image_size_[1] = image_height;
 
-  Matrix3d world_to_local_rotation;
+  Matrix3d world_to_camera_rotation;
   Vector3d position;
   Matrix3d calibration_matrix;
   DecomposeProjectionMatrix(projection_matrix,
                             &calibration_matrix,
-                            &world_to_local_rotation,
+                            &world_to_camera_rotation,
                             &position);
 
-  const Eigen::Matrix3d world_to_shared_rotation = shared_to_local_rotation.inverse() * world_to_local_rotation;
+  const Eigen::Matrix3d world_to_shared_rotation = shared_to_camera_rotation.inverse() * world_to_camera_rotation;
   const Eigen::AngleAxisd world_to_shared_aa(world_to_shared_rotation);
 
   Map<Vector3d>(mutable_extrinsics().mutable_extrinsics() + SharedExtrinsics::ORIENTATION) = world_to_shared_aa.angle() * world_to_shared_aa.axis();
@@ -132,7 +132,7 @@ double Camera::ProjectPoint(const Vector4d& point, Vector2d* pixel) const {
   return ProjectPointToImage(extrinsics().extrinsics(),
                              intrinsics(),
                              point.data(),
-                             GetSharedToLocalTransform(),
+                             GetSharedToCameraTransform(),
                              pixel->data());
 }
 
@@ -168,17 +168,17 @@ Vector3d Camera::GetPosition() const {
   return Map<const Vector3d>(extrinsics().extrinsics() + SharedExtrinsics::POSITION);
 }
 
-void Camera::SetOrientationFromRotationMatrix(const Matrix3d& world_to_local_rotation) {
-  const Eigen::Matrix3d world_to_shared_rotation = shared_to_local_rotation.inverse() * world_to_local_rotation;
+void Camera::SetOrientationFromRotationMatrix(const Matrix3d& world_to_camera_rotation) {
+  const Eigen::Matrix3d world_to_shared_rotation = shared_to_camera_rotation.inverse() * world_to_camera_rotation;
 
   ceres::RotationMatrixToAngleAxis(
       ceres::ColumnMajorAdapter3x3(world_to_shared_rotation.data()),
       mutable_extrinsics().mutable_extrinsics() + SharedExtrinsics::ORIENTATION);
 }
 
-void Camera::SetOrientationFromAngleAxis(const Vector3d& world_to_local_angle_axis) {
-  const Eigen::AngleAxisd world_to_local_aa(world_to_local_angle_axis.norm(), world_to_local_angle_axis.normalized());
-  const Eigen::AngleAxisd world_to_shared_aa(Eigen::Quaterniond(shared_to_local_rotation).inverse() * world_to_local_aa);
+void Camera::SetOrientationFromAngleAxis(const Vector3d& world_to_camera_angle_axis) {
+  const Eigen::AngleAxisd world_to_camera_aa(world_to_camera_angle_axis.norm(), world_to_camera_angle_axis.normalized());
+  const Eigen::AngleAxisd world_to_shared_aa(Eigen::Quaterniond(shared_to_camera_rotation).inverse() * world_to_camera_aa);
 
   Map<Vector3d>(mutable_extrinsics().mutable_extrinsics() + SharedExtrinsics::ORIENTATION) = world_to_shared_aa.angle() * world_to_shared_aa.axis();
 }
@@ -188,8 +188,7 @@ Matrix3d Camera::GetOrientationAsRotationMatrix() const {
   ceres::AngleAxisToRotationMatrix(
       extrinsics().extrinsics() + SharedExtrinsics::ORIENTATION,
       ceres::ColumnMajorAdapter3x3(world_to_shared_rotation.data()));
-      // std::cout << std::hex << "{" << this << "}Camera::GetOrientationAsRotationMatrix: " << shared_to_local_rotation * world_to_shared_rotation << std::endl;
-  return shared_to_local_rotation * world_to_shared_rotation;
+  return shared_to_camera_rotation * world_to_shared_rotation;
 }
 
 Vector3d Camera::GetOrientationAsAngleAxis() const {

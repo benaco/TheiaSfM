@@ -45,8 +45,8 @@ namespace theia {
 struct ReprojectionError {
  public:
   explicit ReprojectionError(const Feature& feature,
-                             const Eigen::Matrix3d sharedToLocalTransform)
-      : feature_(feature), sharedToLocalTransform(sharedToLocalTransform) {}
+                             const Eigen::Matrix3d shared_to_camera_transform)
+      : feature_(feature), shared_to_camera_transform(shared_to_camera_transform) {}
 
   template<typename T> bool operator()(const T* camera_intrinsics,
                       const T* camera_extrinsics,
@@ -64,26 +64,26 @@ struct ReprojectionError {
     ProjectPointToImage(camera_extrinsics,
                         camera_intrinsics,
                         point_parameters,
-                        sharedToLocalTransform,
+                        shared_to_camera_transform,
                         reprojection);
     reprojection_error[0] = reprojection[0] - T(feature_.x());
     reprojection_error[1] = reprojection[1] - T(feature_.y());
     return true;
   }
 
-  static ceres::CostFunction* Create(const Feature& feature, const Eigen::Matrix3d& sharedToLocalTransform) {
+  static ceres::CostFunction* Create(const Feature& feature, const Eigen::Matrix3d& shared_to_camera_transform) {
     static const int kPointSize = 4;
     return new ceres::AutoDiffCostFunction<ReprojectionError,
                                            2,
                                            Camera::kIntrinsicsSize,
                                            SharedExtrinsics::kExtrinsicsSize,
                                            kPointSize>(
-        new ReprojectionError(feature, sharedToLocalTransform));
+        new ReprojectionError(feature, shared_to_camera_transform));
   }
 
  private:
   const Feature feature_;
-  const Eigen::Matrix3d sharedToLocalTransform;
+  const Eigen::Matrix3d shared_to_camera_transform;
 };
 
 }  // namespace theia

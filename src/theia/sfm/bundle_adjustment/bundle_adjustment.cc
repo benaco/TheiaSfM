@@ -202,7 +202,7 @@ BundleAdjustmentSummary BundleAdjustPartialReconstruction(
       }
 
       problem.AddResidualBlock(
-          ReprojectionError::Create(*feature, camera->GetSharedToLocalTransform()),
+          ReprojectionError::Create(*feature, camera->GetSharedToCameraTransform()),
           loss_function.get(),
           camera->mutable_intrinsics(),
           camera->mutable_extrinsics().mutable_extrinsics(),
@@ -239,7 +239,7 @@ BundleAdjustmentSummary BundleAdjustPartialReconstruction(
       Camera* camera = view->MutableCamera();
       const Feature* feature = CHECK_NOTNULL(view->GetFeature(track_id));
       problem.AddResidualBlock(
-          ReprojectionError::Create(*feature, camera->GetSharedToLocalTransform()),
+          ReprojectionError::Create(*feature, camera->GetSharedToCameraTransform()),
           loss_function.get(),
           camera->mutable_intrinsics(),
           camera->mutable_extrinsics().mutable_extrinsics(),

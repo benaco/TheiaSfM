@@ -155,13 +155,13 @@ BundleAdjustmentSummary BundleAdjustTwoViews(
   // Add triangulated points to the problem.
   for (int i = 0; i < points3d->size(); i++) {
     problem.AddResidualBlock(
-        ReprojectionError::Create(correspondences[i].feature1, camera1->GetSharedToLocalTransform()),
+        ReprojectionError::Create(correspondences[i].feature1, camera1->GetSharedToCameraTransform()),
         NULL,
         camera1->mutable_intrinsics(),
         camera1->mutable_extrinsics().mutable_extrinsics(),
         points3d->at(i).data());
     problem.AddResidualBlock(
-        ReprojectionError::Create(correspondences[i].feature2, camera2->GetSharedToLocalTransform()),
+        ReprojectionError::Create(correspondences[i].feature2, camera2->GetSharedToCameraTransform()),
         NULL,
         camera2->mutable_intrinsics(),
         camera2->mutable_extrinsics().mutable_extrinsics(),

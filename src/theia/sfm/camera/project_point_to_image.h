@@ -59,7 +59,7 @@ template <typename T>
 T ProjectPointToImage(const T* extrinsic_parameters,
                       const T* intrinsic_parameters,
                       const T* point,
-                      const Eigen::Matrix3d& sharedToLocalSpace,
+                      const Eigen::Matrix3d& shared_to_camera_transform,
                       T* pixel) {
   typedef Eigen::Matrix<T, 3, 1> Matrix3T;
   typedef Eigen::Map<const Matrix3T> ConstMap3T;
@@ -76,7 +76,7 @@ T ProjectPointToImage(const T* extrinsic_parameters,
                               shared_point.data());
 
   // Rotate the point again into the derived camera's space.
-  Eigen::Matrix<T, 3, 1> rotated_point = sharedToLocalSpace.cast<T>() * shared_point;
+  Eigen::Matrix<T, 3, 1> rotated_point = shared_to_camera_transform.cast<T>() * shared_point;
 
   // Get normalized pixel projection at image plane depth = 1.
   const T& depth = rotated_point[2];
