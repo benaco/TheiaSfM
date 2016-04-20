@@ -77,8 +77,9 @@ bool AddViewToReconstruction(const std::string& image_filepath,
 bool AddViewToReconstructionWithSharedExtrinsics(
   const std::string& image_filepath,
   const CameraIntrinsicsPrior* intrinsics,
-  Reconstruction* reconstruction,
-  const std::shared_ptr<SharedExtrinsics>& shared_extrinsics
+  const std::shared_ptr<SharedExtrinsics>& shared_extrinsics,
+  const Eigen::Matrix3d& transform,
+  Reconstruction* reconstruction
   ) {
 
   std::string image_filename;
@@ -99,6 +100,7 @@ bool AddViewToReconstructionWithSharedExtrinsics(
   }
   // Set shared extrinsics
   view->MutableCamera()->SetSharedExtrinsics(shared_extrinsics);
+  view->MutableCamera()->SetSharedToCameraTransform(transform);
   return true;
 }
 
@@ -221,11 +223,44 @@ bool ReconstructionBuilder::AddImagesWithSharedExtrinsics(
 
   std::shared_ptr<SharedExtrinsics> shared_extrinsics = std::make_shared<SharedExtrinsics>();
   for (const auto& image_filepath : image_filepaths) {
+
+    Eigen::Matrix3d transform;
+    switch (image_filepath[image_filepath.size() - 5]) {
+      case 'n': {
+        transform = Eigen::Matrix3d::Identity();
+        break;
+      }
+      case 'e': {
+        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 2.0, Eigen::Vector3d::UnitY()).toRotationMatrix();
+        break;
+      }
+      case 's': {
+        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 4.0, Eigen::Vector3d::UnitY()).toRotationMatrix();
+        break;
+      }
+      case 'w': {
+        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 6.0, Eigen::Vector3d::UnitY()).toRotationMatrix();
+        break;
+      }
+      case 'u': {
+        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 6.0, Eigen::Vector3d::UnitX()).toRotationMatrix();
+        break;
+      }
+      case 'd': {
+        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 2.0, Eigen::Vector3d::UnitX()).toRotationMatrix();
+        break;
+      }
+      default: {
+        continue;
+      }
+    }
+
     image_filepaths_.emplace_back(image_filepath);
     if (!AddViewToReconstructionWithSharedExtrinsics(image_filepath,
         &camera_intrinsics_prior,
-        reconstruction_.get(),
-        shared_extrinsics
+        shared_extrinsics,
+        transform,
+        reconstruction_.get()
       )) {
       return false;
     }
