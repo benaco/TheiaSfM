@@ -229,6 +229,8 @@ FeatureMatcher<DistanceMetric>::FeatureMatcher(
     // the maximum.
     matcher_options_.cache_capacity = std::numeric_limits<int>::max();
   }
+
+  SetImagePairsToMatch(matcher_options_.pairs_to_match);
 }
 
 template <class DistanceMetric>

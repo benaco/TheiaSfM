@@ -105,6 +105,9 @@ class IncrementalReconstructionEstimator : public ReconstructionEstimator {
   // views as estimated.
   void InitializeCamerasFromTwoViewInfo(const ViewIdPair& view_ids);
 
+  // Insert an esimated view into the reconstruction.
+  bool InsertEstimatedView(Timer &timer, ViewId view_id);
+
   // Estimates all possible 3D points in the view. This is useful during
   // incremental SfM because we only need to triangulate points that were added
   // with new views.

@@ -73,6 +73,9 @@ struct FeatureMatcherOptions {
   // Only images that contain more feature matches than this number will be
   // returned.
   int min_num_feature_matches = 30;
+
+  // The set of image pairs to match. If empty, match all pairs.
+  std::vector<std::pair<std::string, std::string> > pairs_to_match;
 };
 
 }  // namespace theia

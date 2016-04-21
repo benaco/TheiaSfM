@@ -15,6 +15,9 @@ TARGET_LINK_LIBRARIES(build_reconstruction theia ${GFLAGS_LIBRARIES} ${GLOG_LIBR
 ADD_EXECUTABLE(build_1dsfm_reconstruction build_1dsfm_reconstruction.cc)
 TARGET_LINK_LIBRARIES(build_1dsfm_reconstruction theia ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
 
+ADD_EXECUTABLE(build_panorama_reconstruction build_panorama_reconstruction.cc)
+TARGET_LINK_LIBRARIES(build_panorama_reconstruction theia ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
+
 # Reconstruction visualization.
 find_package(OpenGL REQUIRED)
 find_package(GLUT REQUIRED)
@@ -76,5 +79,5 @@ TARGET_LINK_LIBRARIES(create_reconstruction_from_strecha_dataset theia ${GFLAGS_
 ADD_EXECUTABLE(upgrade_matches_file upgrade_matches_file.cc)
 TARGET_LINK_LIBRARIES(upgrade_matches_file theia ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
 
-ADD_EXECUTABLE(upgrade_reconstruction_file upgrade_reconstruction_file.cc)
-TARGET_LINK_LIBRARIES(upgrade_reconstruction_file theia ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
+# ADD_EXECUTABLE(upgrade_reconstruction_file upgrade_reconstruction_file.cc)
+# TARGET_LINK_LIBRARIES(upgrade_reconstruction_file theia ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})

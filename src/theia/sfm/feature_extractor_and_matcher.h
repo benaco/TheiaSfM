@@ -103,6 +103,9 @@ class FeatureExtractorAndMatcher {
       std::vector<CameraIntrinsicsPrior>* intrinsics,
       std::vector<ImagePairMatch>* matches);
 
+  void SetImagePairsToMatch(
+      const std::vector<std::pair<std::string, std::string> >& pairs_to_match);
+
  private:
   // Processes a single image by extracting EXIF information, extracting
   // features and descriptors, and adding the image to the matcher.
