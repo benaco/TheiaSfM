@@ -217,56 +217,23 @@ bool ReconstructionBuilder::AddImageWithCameraIntrinsicsPrior(
 }
 
 
-bool ReconstructionBuilder::AddImagesWithSharedExtrinsics(
-  const std::vector<std::string>& image_filepaths,
-  const CameraIntrinsicsPrior& camera_intrinsics_prior) {
+bool ReconstructionBuilder::AddImageDerived(
+  const std::string &image_filepath,
+  const CameraIntrinsicsPrior &camera_intrinsics_prior,
+  const std::shared_ptr<SharedExtrinsics>& shared_extrinsics,
+  Eigen::Matrix3d shared_to_camera_transform) {
 
-  std::shared_ptr<SharedExtrinsics> shared_extrinsics = std::make_shared<SharedExtrinsics>();
-  for (const auto& image_filepath : image_filepaths) {
-
-    Eigen::Matrix3d transform;
-    switch (image_filepath[image_filepath.size() - 5]) {
-      case 'n': {
-        transform = Eigen::Matrix3d::Identity();
-        break;
-      }
-      case 'e': {
-        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 2.0, Eigen::Vector3d::UnitY()).toRotationMatrix();
-        break;
-      }
-      case 's': {
-        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 4.0, Eigen::Vector3d::UnitY()).toRotationMatrix();
-        break;
-      }
-      case 'w': {
-        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 6.0, Eigen::Vector3d::UnitY()).toRotationMatrix();
-        break;
-      }
-      case 'u': {
-        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 6.0, Eigen::Vector3d::UnitX()).toRotationMatrix();
-        break;
-      }
-      case 'd': {
-        transform = Eigen::AngleAxisd(2.0 * M_PI / 8.0 * 2.0, Eigen::Vector3d::UnitX()).toRotationMatrix();
-        break;
-      }
-      default: {
-        continue;
-      }
-    }
-
-    image_filepaths_.emplace_back(image_filepath);
-    if (!AddViewToReconstructionWithSharedExtrinsics(image_filepath,
-        &camera_intrinsics_prior,
-        shared_extrinsics,
-        transform,
-        reconstruction_.get()
-      )) {
-      return false;
-    }
-    if (!feature_extractor_and_matcher_->AddImage(image_filepath,camera_intrinsics_prior)) {
-      return false;
-    }
+  image_filepaths_.emplace_back(image_filepath);
+  if (!AddViewToReconstructionWithSharedExtrinsics(image_filepath,
+      &camera_intrinsics_prior,
+      shared_extrinsics,
+      shared_to_camera_transform,
+      reconstruction_.get()
+    )) {
+    return false;
+  }
+  if (!feature_extractor_and_matcher_->AddImage(image_filepath,camera_intrinsics_prior)) {
+    return false;
   }
 
   return true;

@@ -36,6 +36,7 @@
 #include <gflags/gflags.h>
 #include <time.h>
 #include <theia/theia.h>
+#include <theia/image/image.h>
 #include <chrono>  // NOLINT
 #include <string>
 #include <vector>
@@ -46,8 +47,6 @@
 // Input/output files.
 DEFINE_string(images, "", "Wildcard of images to reconstruct.");
 DEFINE_string(matches_file, "", "Filename of the matches file.");
-DEFINE_string(calibration_file, "",
-              "Calibration file containing image calibration data.");
 DEFINE_string(
     output_matches_file, "",
     "File to write the two-view matches to. This file can be used in "
@@ -57,6 +56,10 @@ DEFINE_string(
     output_reconstruction, "",
     "Filename to write reconstruction to. The filename will be appended with "
     "the reconstruction number if multiple reconstructions are created.");
+DEFINE_string(
+    output_rectification, "",
+    "Directory to write the rectified images to. "
+        "Will be created if it doesn't exist.");
 
 // Multithreading.
 DEFINE_int32(num_threads, 1,
@@ -198,6 +201,55 @@ using theia::Reconstruction;
 using theia::ReconstructionBuilder;
 using theia::ReconstructionBuilderOptions;
 using theia::SharedExtrinsics;
+using theia::UcharImage;
+
+using Eigen::Matrix3d;
+
+struct Orientation {
+  std::string suffix;
+  Matrix3d rotation;
+
+  Orientation(const std::string& suffix, const Matrix3d& rotation)
+      : suffix(suffix), rotation(rotation) {
+  }
+};
+
+// Rotations are counter-clockwise in a right-handed coordinate system,
+// and clockwise in a left-handed coordinate system.
+const std::vector<Orientation> orientations = {
+    Orientation("forwards",  Eigen::Matrix3d::Identity()),
+    Orientation("left",  Eigen::AngleAxisd(M_PI_2, Eigen::Vector3d::UnitY()).toRotationMatrix()),
+    Orientation("back",  Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitY()).toRotationMatrix()),
+    Orientation("right",  Eigen::AngleAxisd(-M_PI_2, Eigen::Vector3d::UnitY()).toRotationMatrix()),
+    Orientation("up",  Eigen::AngleAxisd(-M_PI_2, Eigen::Vector3d::UnitX()).toRotationMatrix()),
+    Orientation("down",  Eigen::AngleAxisd(M_PI_2, Eigen::Vector3d::UnitX()).toRotationMatrix()),
+};
+
+cimg_library::CImg<double> ComputeRectificationMapping(const unsigned int panoWidth,
+                                                       const unsigned int panoHeight,
+                                                       const unsigned int pinholeWidth,
+                                                       const unsigned int pinholeHeight,
+                                                       const Matrix3d &pinholeCamera) {
+  Matrix3d camInverse = pinholeCamera.inverse();
+
+  cimg_library::CImg<double> mapping(pinholeWidth, pinholeHeight, 1, 2);
+  for (unsigned int y = 0; y < pinholeHeight; y++) {
+    for (unsigned int x = 0; x < pinholeWidth; x++) {
+      Eigen::Vector3d screenPoint(x, y, 1.0);
+
+      Eigen::Vector3d rayDirection = (camInverse * screenPoint).normalized();
+      double theta = std::acos(-rayDirection(1));
+      double phi = std::atan2(rayDirection(2), rayDirection(0));
+
+      // Note: positive X has theta == 0, positive Z has pi/2, negative X has +-pi and negative Z has -pi/2
+      // We want to remap them such that negative X is 0.25 and positive X is 0.75.
+      mapping(x, y, 0) = std::fmod(3 * M_PI_2 - phi, 2 * M_PI) / (2 * M_PI) * panoWidth;
+      mapping(x, y, 1) = theta * M_1_PI * panoHeight;
+    }
+  }
+
+  return mapping;
+}
 
 // Sets the feature extraction, matching, and reconstruction options based on
 // the command line flags. There are many more options beside just these located
@@ -342,32 +394,87 @@ void AddImagesToReconstructionBuilder(
 
   CHECK_GT(image_files.size(), 0) << "No images found in: " << FLAGS_images;
 
-  theia::CameraIntrinsicsPrior hardcoded_prior;
-  hardcoded_prior.image_width = 1024;
-  hardcoded_prior.image_height = 1024;
-  hardcoded_prior.focal_length.is_set = true;
-  hardcoded_prior.focal_length.value = 429.619;
-  hardcoded_prior.principal_point[0].is_set = true;
-  hardcoded_prior.principal_point[0].value = 512;
-  hardcoded_prior.principal_point[1].is_set = true;
-  hardcoded_prior.principal_point[1].value = 512;
-  hardcoded_prior.radial_distortion[0].is_set = true;
-  hardcoded_prior.radial_distortion[0].value = 0;
-  hardcoded_prior.radial_distortion[1].is_set = true;
-  hardcoded_prior.radial_distortion[1].value = 0;
-  hardcoded_prior.skew.is_set = true;
-  hardcoded_prior.skew.value = 0;
+  constexpr unsigned int cameraResolution = 1024;
+  constexpr double cameraPrincipal = cameraResolution / 2.0;
+  constexpr double cameraFocal = cameraResolution / 2.0;
 
-  std::unordered_map<std::string, std::vector<std::string>> image_groups;
-  for (const std::string& image_file : image_files) {
-    image_groups[std::string(image_file.begin(), image_file.begin() + image_file.size() - 5)].push_back(image_file);
+  theia::CameraIntrinsicsPrior synthetic_intrinsics;
+  synthetic_intrinsics.image_width = cameraResolution;
+  synthetic_intrinsics.image_height = cameraResolution;
+  synthetic_intrinsics.focal_length.is_set = true;
+  synthetic_intrinsics.focal_length.value = cameraFocal;
+  synthetic_intrinsics.principal_point[0].is_set = true;
+  synthetic_intrinsics.principal_point[0].value = cameraPrincipal;
+  synthetic_intrinsics.principal_point[1].is_set = true;
+  synthetic_intrinsics.principal_point[1].value = cameraPrincipal;
+  synthetic_intrinsics.radial_distortion[0].is_set = true;
+  synthetic_intrinsics.radial_distortion[0].value = 0;
+  synthetic_intrinsics.radial_distortion[1].is_set = true;
+  synthetic_intrinsics.radial_distortion[1].value = 0;
+  synthetic_intrinsics.skew.is_set = true;
+  synthetic_intrinsics.skew.value = 0;
+
+  std::map<
+      std::tuple<int, int, std::string>,
+      cimg_library::CImg<double>
+      > orientation_warps;
+
+  std::string rectification_output_dir;
+  CHECK_GT(FLAGS_output_rectification.size(), 0)
+    << "Must specify a directory to output the rectification.";
+  rectification_output_dir = FLAGS_output_rectification;
+  if (!theia::DirectoryExists(rectification_output_dir)) {
+    CHECK(theia::CreateDirectory(rectification_output_dir))
+      << "Unable to create rectification output directory " << rectification_output_dir;
   }
 
-  for (const auto& image_group : image_groups) {
+  for (const auto& image_file : image_files) {
+    cimg_library::CImg<uint8_t> pano_image;
+    std::shared_ptr<SharedExtrinsics> extrinsics = std::make_shared<SharedExtrinsics>();
 
-    CHECK_EQ(image_group.second.size(), 6);
-    CHECK(reconstruction_builder->AddImagesWithSharedExtrinsics(image_group.second, hardcoded_prior));
+    for (const auto& orientation : orientations) {
+      std::string filename;
+      theia::GetFilenameFromFilepath(image_file, false, &filename);
+      std::string rectified_path = rectification_output_dir + "/" + filename + "_" + orientation.suffix + ".pnm";
+      if (!theia::FileExists(rectified_path)) {
+        if (pano_image.is_empty()) {
+          pano_image.load(image_file.c_str());
+        }
 
+        LOG(INFO) << "Rectifying " << filename;
+
+        auto& warp = orientation_warps[std::tuple<int, int, std::string>(pano_image.width(), pano_image.height(), orientation.suffix)];
+
+        // See if we've already computed a warp for this resolution and orientation.
+        if (warp.is_empty()) {
+          Eigen::Matrix3d cameraIntrinsic;
+          cameraIntrinsic <<
+          cameraFocal, 0, cameraPrincipal,
+              0, cameraFocal, cameraPrincipal,
+              0,           0,               1;
+
+          Eigen::Matrix3d cameraMatrix = cameraIntrinsic * orientation.rotation;
+          warp = ComputeRectificationMapping(
+              pano_image.width(), pano_image.height(),
+              cameraResolution, cameraResolution,
+              cameraMatrix
+          );
+        }
+
+        cimg_library::CImg<uint8_t> rectified_image = pano_image.get_warp(warp, false);
+
+        rectified_image.save_pnm(rectified_path.c_str());
+      } else {
+        LOG(INFO) << "Found " << rectified_path << ", skipping";
+      }
+
+      CHECK(reconstruction_builder->AddImageDerived(
+            rectified_path,
+            synthetic_intrinsics,
+            extrinsics,
+            orientation.rotation
+      ));
+    }
   }
 
   // Extract and match features.

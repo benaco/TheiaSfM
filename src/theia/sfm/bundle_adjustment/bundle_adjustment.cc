@@ -188,9 +188,7 @@ BundleAdjustmentSummary BundleAdjustPartialReconstruction(
                                  camera->mutable_intrinsics(),
                                  &problem);
 
-    // Add camera parameters to group 1.
-    parameter_ordering->AddElementToGroup(camera->mutable_intrinsics(), 1);
-    parameter_ordering->AddElementToGroup(camera->mutable_extrinsics().mutable_extrinsics(), 1);
+    bool tracks_added = false;
 
     // Add residuals for all tracks in the view.
     for (const TrackId track_id : view->TrackIds()) {
@@ -201,6 +199,8 @@ BundleAdjustmentSummary BundleAdjustPartialReconstruction(
         continue;
       }
 
+      tracks_added = true;
+
       problem.AddResidualBlock(
           ReprojectionError::Create(*feature, camera->GetSharedToCameraTransform()),
           loss_function.get(),
@@ -210,6 +210,12 @@ BundleAdjustmentSummary BundleAdjustPartialReconstruction(
       // Add the point to group 0.
       parameter_ordering->AddElementToGroup(track->MutablePoint()->data(), 0);
       problem.SetParameterBlockConstant(track->MutablePoint()->data());
+    }
+
+    if (tracks_added) {
+      // Add camera parameters to group 1.
+      parameter_ordering->AddElementToGroup(camera->mutable_intrinsics(), 1);
+      parameter_ordering->AddElementToGroup(camera->mutable_extrinsics().mutable_extrinsics(), 1);
     }
   }
 

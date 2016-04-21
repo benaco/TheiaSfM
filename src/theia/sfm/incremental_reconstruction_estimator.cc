@@ -219,14 +219,16 @@ ReconstructionEstimatorSummary IncrementalReconstructionEstimator::Estimate(
         return summary_;
       }
 
+      LOG(INFO) << "Estimated view " << views_to_localize[i] << " ptr: " << reconstruction->MutableView(views_to_localize[i]);
+
       // Insert all views that share extrinsics with the view we just localized.
       for (const auto& sibling_view_id : view_ids) {
-        const auto& sibling_view = reconstruction->MutableView(sibling_view_id);
+        View* sibling_view = reconstruction->MutableView(sibling_view_id);
         if (sibling_view_id != views_to_localize[i]
             && !sibling_view->IsEstimated()
-            && &(sibling_view->Camera().extrinsics()) == &(reconstruction->View(views_to_localize[i])->Camera().extrinsics())) {
+            && &(sibling_view->Camera().extrinsics()) == &(reconstruction_->View(views_to_localize[i])->Camera().extrinsics())) {
 
-          reconstruction_->MutableView(sibling_view_id)->SetEstimated(true);
+          sibling_view->SetEstimated(true);
 
           reconstructed_views_.push_back(sibling_view_id);
           views_to_localize_.erase(sibling_view_id);
@@ -236,6 +238,8 @@ ReconstructionEstimatorSummary IncrementalReconstructionEstimator::Estimate(
             summary_.success = false;
             return summary_;
           }
+
+          LOG(INFO) << "Inserted sibling view " << sibling_view_id << " ptr: " << sibling_view;
         }
       }
     }
